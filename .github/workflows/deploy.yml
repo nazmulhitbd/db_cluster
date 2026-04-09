@@ -4,18 +4,21 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Allows you to run this manually from the GitHub UI
 
 jobs:
   terraform:
-    name: "Terraform"
+    name: "Terraform Deployment"
     runs-on: ubuntu-latest
     
     env:
+      # Ensures compatibility with Node.js 24 runners in 2026
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # Maps your GitHub Secret to the Terraform variable
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -27,12 +30,21 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0" # Specify a version for consistency
+          terraform_wrapper: false   # Setting to false avoids issues with output formatting in logs
 
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Format Check
+        run: terraform fmt -check # Good practice: ensures your code is formatted correctly
+
       - name: Terraform Plan
-        run: terraform plan
+        id: plan
+        run: terraform plan -input=false
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        # Only run Apply if the push was to the 'main' branch
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -input=false
